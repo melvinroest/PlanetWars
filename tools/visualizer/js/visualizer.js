@@ -1,3 +1,12 @@
+//vars by Melvin
+var realTurnCounter = 0
+var realTurnLength = -1
+var determineTurn = -1
+var determineTurnLength = -1
+var isParallel = -1; //0 == false, 1 == true, -1 == uninitialized
+var forward = true
+//end vars by Melvin
+
 var Visualizer = {
     canvas: null,
     ctx: null,
@@ -68,9 +77,85 @@ var Visualizer = {
         var disp_x = 0, disp_y = 0;
         var ctx = this.ctx;
         var frameNumber = Math.floor(frame);
-        
         var planetStats = this.moves[frameNumber].planets;
         var fleets = this.moves[frameNumber].moving;
+
+        //all this code helps to determine if something is a real turn - code by Melvin
+
+        if(isParallel == -1){ //game is uninitialized
+          //determine the total amount of turns
+          var turnLengthCounter = 0
+          for(var i=0; i < this.moves.length; i++ ){
+              var turn = this.moves[i]
+              for(var j=0; j < turn.moving.length; j++ ){
+                  var fleet = turn.moving[j]
+                  if(fleet.progress == 1){
+                    turnLengthCounter += 1                
+                  } 
+              }
+          }
+          realTurnLength = turnLengthCounter
+        }
+        //determine if this is a parallel game, if it is then there should be 2 fleets in flight
+        if(fleets.length == 2 && isParallel == -1){ 
+          isParallel = 1
+          realTurnLength = realTurnLength/2 //every turn was counted twice, because a serial game was assumed
+        }
+
+        if(fleets.length == 1 && isParallel == -1){
+          isParallel = 0 //this is a serial game, because one fleet is in flight
+        }
+
+        //if the first frame is drawn set the turn to 0
+        if(frame == 1){
+          determineTurn = -1
+          realTurnCounter = 0
+        }
+
+        //if the last frame is drawn set the turn to the final turn
+        if(frame == Visualizer.moves.length-1){
+          realTurnCounter = realTurnLength
+        }
+
+        //otherwise check if this frame differs from the previous frame (in owner)
+        //in the serial game this is seen when the fleets.length go from 0 to 1
+
+        //if the game is serial, then do the following
+        if(isParallel == 0){
+          if(fleets.length != determineTurn){
+            determineTurn = fleets.length;
+
+            //determine if the game is progressing forward
+            if(determineTurn == 1 && forward == true){
+              realTurnCounter += 1
+            }
+
+            //determine if the game is progressing backward
+            else if(determineTurn == 1 && forward == false){
+              realTurnCounter -= 1
+            }
+
+          }
+        } 
+
+        //if the game is parallel then do the following
+        //only execute the code when 2 fleets are active, for the rest, the idea is the same
+        if(isParallel == 1){
+          if(fleets.length != determineTurn && fleets.length != 1){
+            determineTurn = fleets.length
+
+            //determine if the game is progressing forward
+            if(determineTurn == 2 && forward == true){
+              realTurnCounter += 1
+            }
+
+            //determine if the game is progressing backward
+            else if(determineTurn == 2 && forward == false){
+              realTurnCounter -= 1
+            }
+          }
+        }
+        //end code by Melvin
         
         this.drawBackground();
         
@@ -226,7 +311,8 @@ var Visualizer = {
       if (this.moves.length / turnsPerSecond > this.config.maxVisualizationTime) {
     	  //ok, increase turns per seconds, otherwise this may take ages.
     	  turnsPerSecond = Math.ceil(this.moves.length / this.config.maxVisualizationTime);
-    	  console.log(this.moves.length + " " + this.config.turnsPerSecond + " " + this.config.maxVisualizationTime);
+    	  //I switched the following off - Melvin
+    	  //console.log(this.moves.length + " " + this.config.turnsPerSecond + " " + this.config.maxVisualizationTime);
       }
       var frameAdvance = (this.frameDrawStarted - this.frameDrawEnded) / (1000 / turnsPerSecond )
       if(isNaN(frameAdvance)){
@@ -349,6 +435,7 @@ var ParserUtils = {
     
     // Hook buttons
     var playAction = function() {
+      forward = true; //var by Melvin
         if(!Visualizer.playing){
           if(Visualizer.frame > Visualizer.moves.length - 2){
             Visualizer.setFrame(0);
@@ -376,6 +463,7 @@ var ParserUtils = {
     });
 
     var prevAction = function() {
+        forward = false; //var by Melvin
         Visualizer.setFrame(Visualizer.frame - 1, true);
         Visualizer.drawFrame(Visualizer.frame);
         Visualizer.stop();
@@ -384,6 +472,7 @@ var ParserUtils = {
     $('#prev-frame-button').click(prevAction);
     
     var nextAction = function() {
+        forward = true; //var by Melvin
         Visualizer.setFrame(Visualizer.frame + 1);
         Visualizer.drawFrame(Visualizer.frame);
         Visualizer.stop();
@@ -405,7 +494,7 @@ var ParserUtils = {
     })
     
     $('#display').bind('drawn', function(){
-      $('#turnCounter').text('Turn: '+Math.floor(Visualizer.frame+1)+' of '+Visualizer.moves.length)
+      $('#turnCounter').text('Turn: '+realTurnCounter+' of '+realTurnLength) //finally this handle is changed in order to display the turns - Melvin
     })
     
     $('.player1Name').html('<a href="profile.php?user_id=' + Visualizer.playerIds[0] + '">' + Visualizer.players[0] + '</a>')
